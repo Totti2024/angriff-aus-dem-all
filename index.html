@@ -325,9 +325,8 @@ const MELODY = [440, 0, 523.25, 0, 659.25, 587.33, 523.25, 0, 440, 0, 392, 0, 44
 const MELODY_TITLE = [329.63, 0, 392, 0, 440, 0, 392, 0, 329.63, 0, 293.66, 0, 329.63, 0, 0, 0];
 function musicTempo() {
   if (state === 'title' || state === 'entername' || state === 'gameover') return 0.32;
-  if (boss) return 0.16;
-  const frac = waveTotal ? enemies.filter(e => e.type !== 'mini').length / waveTotal : 1;
-  return Math.max(0.12, 0.34 - (1 - frac) * 0.2 - Math.min(wave, 20) * 0.003);
+  // ruhiges, gleichbleibendes Tempo; beim Boss nur leicht schneller
+  return boss ? 0.26 : 0.30;
 }
 function updateMusic() {
   if (!ac || !soundOn || state === 'paused') return;
