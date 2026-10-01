@@ -291,18 +291,17 @@ function noise(dur, vol = 0.2, freq = 2000, when = 0) {
 const sfx = {
   shoot() { tone(1400, 0.04, 'square', 0.025, 900); },
   hit() { noise(0.06, 0.12, 4000); tone(300, 0.05, 'square', 0.05, 200); },
-  kill() { // Variante D aus der Hoerprobe: Laser-Zisch
+  kill() { // Variante B aus der Hoerprobe: 8-Bit-Plopp
     if (!ac || !soundOn) return;
+    [880, 660, 494, 330].forEach((f, i) => tone(f, 0.05, 'square', 0.07, null, i * 0.035));
     const t = ac.currentTime;
-    tone(1400, 0.2, 'sawtooth', 0.08, 120);
     const s = ac.createBufferSource(); s.buffer = noiseBuf;
-    const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 2;
-    f.frequency.setValueAtTime(6000, t); f.frequency.exponentialRampToValueAtTime(1500, t + 0.12);
+    const f = ac.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 2500;
     const g = ac.createGain();
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.15, t + 0.003);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.12, t + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.08);
     s.connect(f); f.connect(g); g.connect(sfxBus);
-    s.start(t, Math.random() * 0.5); s.stop(t + 0.15);
+    s.start(t, Math.random() * 0.5); s.stop(t + 0.1);
   },
   bigBoom() { noise(1.2, 0.45, 900); tone(90, 1.0, 'sawtooth', 0.2, 25); },
   playerHit() { noise(0.5, 0.35, 1200); tone(500, 0.6, 'sawtooth', 0.18, 50); },
