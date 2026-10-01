@@ -161,6 +161,14 @@ const SPR = {
     '.D..D.D..D.',
     'D.........D'
   ]],
+  ufo: [
+    '....RRRRR....',
+    '..RRRRRRRRR..',
+    '.RRWRRWRRWRR.',
+    'RRRRRRRRRRRRR',
+    '..RRR...RRR..',
+    '...R.....R...'
+  ],
   mini: [[
     'M.....M',
     '.MMMMM.',
@@ -331,6 +339,7 @@ let state = 'title';      // title | play | paused | gameover | entername
 let stateT = 0;           // Frames seit Zustandswechsel
 let score = 0, lives = 3, wave = 1, nextLifeAt = 10000;
 let player, bullets, eBullets, enemies, particles, capsules, popups, barricades, boss, form;
+let ufo = null, ufoT = 0;
 let waveTotal = 0, banner = null, waveEndT = 0, shake = 0, deathT = 0;
 let stars = [];
 let fireT = 0;
@@ -399,6 +408,15 @@ function hitBarricade(x, y, r = 1.8) {
   }
   return false;
 }
+// Eigene Schuesse prallen ab, ohne die Wand zu beschaedigen
+function blockedByBarricade(x, y) {
+  for (const bar of barricades) {
+    if (x < bar.x || x >= bar.x + BW * BC || y < bar.y || y >= bar.y + BH * BC) continue;
+    const cx = Math.floor((x - bar.x) / BC), cy = Math.floor((y - bar.y) / BC);
+    if (bar.m[cy] && bar.m[cy][cx]) return true;
+  }
+  return false;
+}
 // Gegner, die durch Barrikaden fliegen, fressen sich durch
 function eraseRect(x, y, w, h) {
   for (const bar of barricades) {
@@ -446,7 +464,7 @@ function waveRows(n) {
 const COLS = 6, CSP = 52, RSP = 40;
 function spawnWave() {
   enemies = []; bullets = []; eBullets = []; capsules = [];
-  boss = null;
+  boss = null; ufo = null; ufoT = 1200 + Math.random() * 600;
   makeBarricades();
   if (wave % 5 === 0) { spawnBoss(); waveTotal = 1; return; }
   const rows = waveRows(wave);
@@ -592,7 +610,16 @@ function update() {
     sfx.shoot();
   }
   for (const b of bullets) { b.x += b.vx; b.y -= 10; }
-  bullets = bullets.filter(b => b.y > -12 && b.x > -10 && b.x < W + 10);
+  bullets = bullets.filter(b => {
+    if (b.y < -12 || b.x < -10 || b.x > W + 10) return false;
+    if (blockedByBarricade(b.x + 1.5, b.y) || blockedByBarricade(b.x + 1.5, b.y + 5)) {
+      explode(b.x + 1.5, b.y + 4, 3, [PAL.P, '#d9a6ff'], 1.5, 2);
+      return false;
+    }
+    return true;
+  });
+
+  updateUfo();
 
   updateEnemies();
   if (boss) updateBoss();
@@ -618,6 +645,9 @@ function update() {
       if (e.hp <= 0) killEnemy(j); else sfx.hit();
       break;
     }
+    if (!used && ufo && rectHit(b.x, b.y, 3, 10, ufo.x, ufo.y, ufo.w, ufo.h)) {
+      used = true; killUfo();
+    }
     if (!used && boss && boss.y > -40 && rectHit(b.x, b.y, 3, 10, boss.x + 6, boss.y, boss.w - 12, boss.h)) {
       used = true; boss.hp--; boss.flash = 4;
       explode(b.x, b.y, 3, [PAL.Y, '#fff'], 2, 3);
@@ -638,7 +668,7 @@ function update() {
 
   // Welle geschafft?
   if (!waveEndT && !enemies.length && !boss) {
-    waveEndT = 150;
+    waveEndT = 150; ufo = null;
     const bonus = pts(100) * (wave % 5 === 0 ? 5 : 1);
     addScore(bonus);
     banner = { text: 'WELLE ' + wave + ' GESCHAFFT', sub: 'BONUS ' + bonus, t: 150, color: GREEN };
@@ -649,6 +679,31 @@ function update() {
     spawnWave();
     if (!boss) banner = { text: 'WELLE ' + wave, sub: waveHint(wave), t: 120, color: GREEN };
   }
+}
+/* ---------- Bonus-UFO wie 1978: nur Punkte ---------- */
+const UFO_PTS = [50, 100, 100, 150, 150, 300];
+function updateUfo() {
+  if (ufo) {
+    ufo.x += ufo.v; ufo.t++;
+    if (ufo.t % 10 === 0) tone(ufo.t % 20 ? 640 : 820, 0.09, 'square', 0.03);
+    if (ufo.x < -60 || ufo.x > W + 60) ufo = null;
+    return;
+  }
+  if (boss || waveEndT || !form || form.y < form.targetY || !enemies.length) return;
+  if (--ufoT <= 0) {
+    ufoT = 1200 + Math.random() * 600; // alle 20 bis 30 Sekunden
+    const dir = Math.random() < 0.5 ? 1 : -1, w = 13 * 3;
+    ufo = { x: dir > 0 ? -w : W, y: playTop - 6, w, h: 18, v: dir * 1.6, t: 0 };
+  }
+}
+function killUfo() {
+  const n = UFO_PTS[Math.floor(Math.random() * UFO_PTS.length)];
+  const cx = ufo.x + ufo.w / 2, cy = ufo.y + ufo.h / 2;
+  addScore(n, cx, cy);
+  const pop = popups[popups.length - 1]; pop.color = PAL.R; pop.t = 70;
+  explode(cx, cy, 22, [PAL.R, PAL.Y, '#fff'], 3, 4);
+  sfx.kill(); tone(1200, 0.25, 'square', 0.08, 300);
+  ufo = null;
 }
 function waveHint(n) {
   return { 3: 'NEU: PANZER, 3 TREFFER', 4: 'NEU: STURZFLIEGER', 6: 'NEU: TEILER', 7: 'NEU: SCHARFSCHUETZEN' }[n] || '';
@@ -1036,6 +1091,8 @@ function drawGame() {
     ctx.fillStyle = PAL.R; ctx.fillRect(14, y, (W - 28) * b.hp / b.max, 6);
     txt(BOSS_NAMES[b.k], W / 2, y - 4, 8, PAL.R, 'center');
   }
+
+  if (ufo) drawSprite(SPR.ufo, ufo.x, ufo.y, 3);
 
   // Kapseln
   for (const c of capsules) {
