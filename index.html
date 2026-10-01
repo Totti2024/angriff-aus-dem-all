@@ -291,7 +291,19 @@ function noise(dur, vol = 0.2, freq = 2000, when = 0) {
 const sfx = {
   shoot() { tone(1400, 0.04, 'square', 0.025, 900); },
   hit() { noise(0.06, 0.12, 4000); tone(300, 0.05, 'square', 0.05, 200); },
-  kill() { noise(0.2, 0.22, 1800); tone(180, 0.18, 'square', 0.08, 60); },
+  kill() { // Variante D aus der Hoerprobe: Laser-Zisch
+    if (!ac || !soundOn) return;
+    const t = ac.currentTime;
+    tone(1400, 0.2, 'sawtooth', 0.08, 120);
+    const s = ac.createBufferSource(); s.buffer = noiseBuf;
+    const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 2;
+    f.frequency.setValueAtTime(6000, t); f.frequency.exponentialRampToValueAtTime(1500, t + 0.12);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.15, t + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+    s.connect(f); f.connect(g); g.connect(sfxBus);
+    s.start(t, Math.random() * 0.5); s.stop(t + 0.15);
+  },
   bigBoom() { noise(1.2, 0.45, 900); tone(90, 1.0, 'sawtooth', 0.2, 25); },
   playerHit() { noise(0.5, 0.35, 1200); tone(500, 0.6, 'sawtooth', 0.18, 50); },
   shield() { tone(1200, 0.15, 'triangle', 0.15, 400); },
