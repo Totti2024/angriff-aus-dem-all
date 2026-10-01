@@ -6,7 +6,7 @@
 <title>Angriff aus dem All</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="Angriff">
 <meta name="theme-color" content="#000000">
 <link rel="manifest" href="manifest.webmanifest">
@@ -50,7 +50,7 @@ const FONT = '"Press Start 2P", "Courier New", monospace';
 const W = 390;
 let H = 844;
 let scale = 1, offX = 0, offY = 0, dpr = 1;
-let safeTop = 0, safeBot = 0;
+let safeTop = 0, safeBot = 0, lastSafe = '';
 
 const cv = document.getElementById('cv');
 const ctx = cv.getContext('2d');
@@ -357,7 +357,9 @@ function layout() {
   scale = Math.min(vw / W, vh / H);
   offX = (vw - W * scale) / 2;
   offY = (vh - H * scale) / 2;
-  safeTop = Math.max(0, st - offY) / scale;
+  const standalone = navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches);
+  lastSafe = cs.paddingTop + '/' + cs.paddingBottom;
+  safeTop = Math.max(0, st - offY) / scale + (standalone && st > 0 ? 14 : 0);
   safeBot = Math.max(0, sb - offY) / scale;
   dpr = Math.min(3, window.devicePixelRatio || 1);
   cv.width = Math.round(vw * dpr); cv.height = Math.round(vh * dpr);
@@ -1351,13 +1353,17 @@ async function requestWake() {
 function releaseWake() { try { if (wakeLock) wakeLock.release(); } catch (e) {} wakeLock = null; }
 
 /* ---------- Hauptschleife mit festem Takt ---------- */
-let last = performance.now(), acc = 0;
+let last = performance.now(), acc = 0, safeCheck = 0;
 const STEP = 1000 / 60;
 function loop(now) {
   acc += Math.min(100, now - last); last = now;
   let n = 0;
   while (acc >= STEP && n < 5) { update(); acc -= STEP; n++; }
   if (n === 5) acc = 0;
+  if (++safeCheck % 60 === 0) {
+    const cs = getComputedStyle(document.getElementById('safe'));
+    if (cs.paddingTop + '/' + cs.paddingBottom !== lastSafe) layout();
+  }
   updateMusic();
   draw();
   requestAnimationFrame(loop);
